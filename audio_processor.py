@@ -6,13 +6,29 @@ import stat
 import zipfile
 import io
 import urllib.request
-
+import streamlit as st
 DOWNLOAD_DIR = 'downloades'
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 # Where we'll self-install Deno if it's not already on PATH (no root needed)
 DENO_BIN_DIR = os.path.join(os.getcwd(), ".deno_bin")
 DENO_BIN_PATH = os.path.join(DENO_BIN_DIR, "deno")
+
+
+def get_cookie_file():
+    """Write cookies from Streamlit secrets to a temp file for yt-dlp, if configured."""
+    try:
+        cookies_content = st.secrets.get("YOUTUBE_COOKIES")
+    except Exception:
+        cookies_content = None
+
+    if not cookies_content:
+        return None
+
+    cookie_path = os.path.join(os.getcwd(), ".yt_cookies.txt")
+    with open(cookie_path, "w") as f:
+        f.write(cookies_content)
+    return cookie_path
 
 
 def ensure_deno_installed():
@@ -64,17 +80,18 @@ def download_youtube_audio(url: str) -> str:
         "format": "bestaudio/best",
         "outtmpl": output_path,
         "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "wav",
-                "preferredquality": "192",
-            }
+            {"key": "FFmpegExtractAudio", "preferredcodec": "wav", "preferredquality": "192"}
         ],
         "quiet": True,
         "retries": 3,
         "fragment_retries": 3,
         "noplaylist": True,
     }
+
+    cookie_file = get_cookie_file()
+    if cookie_file:
+        ydl_opts["cookiefile"] = cookie_file
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info).replace(".webm", ".wav").replace(".m4a", ".wav")
