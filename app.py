@@ -1,3 +1,5 @@
+import os
+import tempfile
 import streamlit as st
 import time
 from dotenv import load_dotenv
@@ -320,7 +322,30 @@ with st.sidebar:
     st.markdown("---")
 
     st.markdown('<span class="badge badge-purple">Input</span>', unsafe_allow_html=True)
-    source = st.text_input("YouTube URL or File Path", placeholder="https://youtube.com/watch?v=... or /path/to/file.mp4")
+
+    input_mode = st.radio(
+        "Source",
+        ["Upload File", "YouTube URL"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    uploaded_file = None
+    source = ""
+
+    if input_mode == "Upload File":
+        uploaded_file = st.file_uploader(
+            "Upload audio/video file",
+            type=["mp4", "mp3", "wav", "m4a", "mov", "mkv", "webm"],
+            label_visibility="collapsed",
+        )
+    else:
+        source = st.text_input(
+            "YouTube URL",
+            placeholder="https://youtube.com/watch?v=...",
+            label_visibility="collapsed",
+        )
+        st.caption("⚠️ YouTube downloads may be blocked on hosted/cloud deployments due to IP restrictions. Uploading a file is more reliable there.")
 
     run_btn = st.button("⚡  Analyse", use_container_width=True)
 
@@ -344,8 +369,13 @@ st.markdown("---")
 
 # ── Run Pipeline ────────────────────────────────────────────────────────────────
 if run_btn:
-    if not source.strip():
-        st.error("Please enter a YouTube URL or file path.")
+    missing_upload = input_mode == "Upload File" and uploaded_file is None
+    missing_url = input_mode == "YouTube URL" and not source.strip()
+
+    if missing_upload:
+        st.error("Please upload a file.")
+    elif missing_url:
+        st.error("Please enter a YouTube URL.")
     else:
         st.session_state.pipeline_done = False
         st.session_state.result = None
@@ -362,7 +392,17 @@ if run_btn:
                 st.info("⚙️ Pipeline running — see sidebar for live status…")
 
             update_step("audio", "active")
-            chunks = process_input(source)
+
+            if input_mode == "Upload File":
+                # Persist the uploaded file to a temp path so process_input can read it
+                suffix = os.path.splitext(uploaded_file.name)[1] or ".mp4"
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    tmp.write(uploaded_file.getvalue())
+                    input_source = tmp.name
+            else:
+                input_source = source.strip()
+
+            chunks = process_input(input_source)
             update_step("audio", "done")
 
             update_step("transcript", "active")
@@ -511,7 +551,7 @@ else:
             Ready to Analyse
         </div>
         <div style="color:var(--text-muted);font-size:0.85rem;max-width:380px;line-height:1.7">
-            Paste a YouTube URL or local file path in the sidebar and hit <strong>Analyse</strong> to get started.
+            Upload an audio/video file, or paste a YouTube URL in the sidebar and hit <strong>Analyse</strong> to get started.
         </div>
         <div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;justify-content:center">
             <span class="badge badge-purple">Transcription</span>
