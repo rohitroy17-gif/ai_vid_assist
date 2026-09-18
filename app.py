@@ -10,8 +10,11 @@ from meeting_extractor import extract_action_items, extract_key_decisions, extra
 from rag_engine import build_rag_chain, ask_question
 
 load_dotenv()
-if "GEMINI_API_KEY" in st.secrets:
-    os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+try:
+    if "GEMINI_API_KEY" in st.secrets:
+        os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    pass  # No secrets configured (e.g. running locally with .env instead)
 
 # ─── Page Config ────────────────────────────────────────────────────────────────
 st.set_page_config(
